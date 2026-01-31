@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Download, Printer, CheckCircle, XCircle } from 'lucide-react';
 import CargoVisualMap from './CargoVisualMap';
-//import LoadSummaryPanel from './LoadSummaryPanel';
+import LoadSummaryPanel from './LoadSummaryPanel';
 import CGEnvelopeChart from './CGEnvelopeChart';
 import SafetyStatusPanel from './SafetyStatusPanel';
 import { calculateSummaryStats } from '../utils/excelParser';
