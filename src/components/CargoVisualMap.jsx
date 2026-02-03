@@ -1,21 +1,65 @@
 import React, { useState } from 'react';
 import { Info } from 'lucide-react';
+import { buildCargoGridLayout } from "../utils/excelParser";
 
-function CargoVisualMap({ positions, visualStatus, uldSpecs }) {
+/**
+ * ENHANCED Multi-Aircraft Cargo Visual Map
+ * Adapts layout dynamically for A320, B737, B777
+ */
+function CargoVisualMapMultiAircraft({ positions, visualStatus, uldSpecs, aircraftParams, aircraftType }) {
   const [hoveredPosition, setHoveredPosition] = useState(null);
+// 
+  const getLayoutConfig = () => {
+    switch (aircraftType) {
+      case "B737":
+        return { rows: 2, cols: 2 };
 
-  // Organize positions into grid layout (A-F rows, 1-2 columns)
-  const positionGrid = [
-    ['A1', 'A2'],
-    ['B1', 'B2'],
-    ['C1', 'C2'],
-    ['D1', 'D2'],
-    ['E1', 'E2'],
-    ['F1', 'F2'],
-  ];
+      case "B777":
+        return { rows: 6, cols: 2 };
+
+      default:
+        return { rows: 6, cols: 2 }; // A320
+    }
+  };
+
+
+const layout = getLayoutConfig();
+
+
+  const filteredPositions = positions.filter(pos => {
+
+    if (aircraftType === "A320") {
+      return /^[A-F][1-2]$/.test(pos.position);
+    }
+
+    if (aircraftType === "B737") {
+      return ["FWD1","FWD2","AFT1","AFT2"].includes(pos.position);
+    }
+
+    if (aircraftType === "B777") {
+      return /^([ML])[1-6]$/.test(pos.position);
+    }
+
+    return true;
+  });
+
+
+
+  // DYNAMIC: Build grid based on aircraft type and actual positions
+  const gridLayout = buildCargoGridLayout(positions, aircraftParams);
+  
+  // Aircraft-specific styling
+  const aircraftInfo = getAircraftInfo(aircraftParams.type);
 
   return (
     <div className="relative">
+      {/* Aircraft Type Badge */}
+      <div className="flex justify-center mb-2">
+        <div className={`px-4 py-1 rounded-full text-sm font-bold ${aircraftInfo.badgeColor}`}>
+          {aircraftParams.type} - {positions.length} Cargo Positions
+        </div>
+      </div>
+
       {/* Aircraft Nose */}
       <div className="flex justify-center mb-4">
         <div className="bg-gray-300 text-gray-700 font-bold py-2 px-8 rounded-t-full border-2 border-gray-400">
@@ -23,29 +67,55 @@ function CargoVisualMap({ positions, visualStatus, uldSpecs }) {
         </div>
       </div>
 
-      {/* Cargo Grid */}
+      {/* DYNAMIC CARGO GRID */}
       <div className="space-y-3">
-        {positionGrid.map((row, rowIndex) => (
-          <div key={rowIndex} className="grid grid-cols-2 gap-4">
-            {row.map(positionId => {
-              const cargo = positions.find(p => p.position === positionId);
-              const status = visualStatus[positionId];
-              const spec = cargo ? uldSpecs[cargo.uldType] : null;
+        {gridLayout.map((row, rowIndex) => {
+          // Handle deck separator for B777
+          if (row === 'DECK_SEPARATOR') {
+            return (
+              <div key={`separator-${rowIndex}`} className="flex justify-center py-2">
+                <div className="w-full border-t-2 border-dashed border-gray-400 relative">
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white px-4 py-1">
+                    <span className="text-xs font-bold text-gray-600">
+                      ━━━ MAIN DECK / LOWER DECK ━━━
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          }
 
-              return (
-                <CargoCell
-                  key={positionId}
-                  positionId={positionId}
-                  cargo={cargo}
-                  status={status}
-                  spec={spec}
-                  onHover={setHoveredPosition}
-                  isHovered={hoveredPosition === positionId}
-                />
-              );
-            })}
-          </div>
-        ))}
+          return (
+            <div 
+              key={rowIndex} 
+              className="grid gap-4"
+              style={{ 
+                gridTemplateColumns: `repeat(${layout.cols}, 1fr)`,
+                maxWidth: aircraftParams.type === 'B737' ? '600px' : '100%',
+                margin: aircraftParams.type === 'B737' ? '0 auto' : '0'
+              }}
+            >
+              {row.map(positionId => {
+                const cargo = positions.find(p => p.position === positionId);
+                const status = visualStatus[positionId];
+                const spec = cargo ? uldSpecs[cargo.uldType] : null;
+
+                return (
+                  <CargoCell
+                    key={positionId}
+                    positionId={positionId}
+                    cargo={cargo}
+                    status={status}
+                    spec={spec}
+                    aircraftType={aircraftParams.type}
+                    onHover={setHoveredPosition}
+                    isHovered={hoveredPosition === positionId}
+                  />
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
 
       {/* Aircraft Tail */}
@@ -65,8 +135,8 @@ function CargoVisualMap({ positions, visualStatus, uldSpecs }) {
   );
 }
 
-function CargoCell({ positionId, cargo, status, spec, onHover, isHovered }) {
-  if (!cargo) {
+function CargoCell({ positionId, cargo, status, spec, aircraftType, onHover, isHovered }) {
+  if (!cargo || !cargo.position) {
     return (
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 text-center">
         <p className="text-gray-400 font-semibold text-sm">EMPTY</p>
@@ -92,10 +162,13 @@ function CargoCell({ positionId, cargo, status, spec, onHover, isHovered }) {
 
   const statusColor = getStatusColor();
 
+  // Aircraft-specific cell sizing
+  const cellSize = aircraftType === 'B737' ? 'p-4' : 'p-3';
+
   return (
     <div
       className={`
-        relative border-2 rounded-lg p-3 transition-all duration-200 cursor-pointer
+        relative border-2 rounded-lg ${cellSize} transition-all duration-200 cursor-pointer
         ${statusColor}
         ${isHovered ? 'shadow-lg scale-105 z-10' : 'shadow'}
       `}
@@ -104,7 +177,9 @@ function CargoCell({ positionId, cargo, status, spec, onHover, isHovered }) {
     >
       {/* Position Label */}
       <div className="bg-gray-200 rounded px-2 py-1 mb-2 text-center">
-        <span className="text-xs font-bold text-gray-700">POS {positionId}</span>
+        <span className="text-xs font-bold text-gray-700">
+          {getDeckBadge(spec)} {positionId}
+        </span>
       </div>
 
       {/* ULD Type and Weight */}
@@ -142,6 +217,7 @@ function CargoCell({ positionId, cargo, status, spec, onHover, isHovered }) {
             <Info className="w-4 h-4" />
           </div>
           <div className="space-y-1">
+            <InfoLine label="Aircraft" value={aircraftType} />
             <InfoLine label="ULD Type" value={cargo.uldType} />
             <InfoLine label="Actual Weight" value={`${cargo.weight.toLocaleString()} kg`} />
             {spec && (
@@ -191,4 +267,30 @@ function LegendItem({ color, label }) {
   );
 }
 
-export default CargoVisualMap;
+function getDeckBadge(spec) {
+  if (!spec) return '';
+  if (spec.deck === 'Main') return '🔵';  // Blue circle for main deck
+  if (spec.deck === 'Lower') return '🟠';  // Orange circle for lower deck
+  return '';
+}
+
+function getAircraftInfo(type) {
+  const info = {
+    'A320': {
+      badgeColor: 'bg-blue-100 text-blue-800 border border-blue-300',
+      name: 'Airbus A320'
+    },
+    'B737': {
+      badgeColor: 'bg-green-100 text-green-800 border border-green-300',
+      name: 'Boeing 737-800'
+    },
+    'B777': {
+      badgeColor: 'bg-purple-100 text-purple-800 border border-purple-300',
+      name: 'Boeing 777-300ER'
+    }
+  };
+  
+  return info[type] || info['A320'];
+}
+
+export default CargoVisualMapMultiAircraft;

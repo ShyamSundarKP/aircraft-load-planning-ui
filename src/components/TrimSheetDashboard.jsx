@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Download, Printer, CheckCircle, XCircle } from 'lucide-react';
 import CargoVisualMap from './CargoVisualMap';
 import LoadSummaryPanel from './LoadSummaryPanel';
@@ -8,8 +8,38 @@ import { calculateSummaryStats } from '../utils/excelParser';
 import { exportToPDF } from '../utils/pdfExport';
 
 function TrimSheetDashboard({ data }) {
+  const [selectedAircraft, setSelectedAircraft] = useState("A320");
+  const aircraftLimits = {
+    A320: { forward: 14, aft: 28 },
+    B737: { forward: 12.5, aft: 24.5 },
+    B777: { forward: 15, aft: 30 }
+  };
+
+  
+<div className="mb-4 flex items-center gap-4">
+  <label className="font-semibold text-gray-700">
+    Aircraft Type:
+  </label>
+
+  <select
+    value={selectedAircraft}
+    onChange={(e) => setSelectedAircraft(e.target.value)}
+    className="border px-3 py-1 rounded"
+  >
+    <option value="A320">Airbus A320</option>
+    <option value="B737">Boeing 737</option>
+    <option value="B777">Boeing 777</option>
+  </select>
+
+</div>
+
+
+
+  const cgLimits = aircraftLimits[selectedAircraft];
   const dashboardRef = useRef(null);
   const summaryStats = calculateSummaryStats(data);
+
+
 
   const handleExportPDF = () => {
     exportToPDF(dashboardRef.current, 'Aircraft_Load_Trim_Sheet.pdf');
@@ -100,11 +130,14 @@ function TrimSheetDashboard({ data }) {
                   <span className="text-2xl mr-2">🛫</span>
                   Aircraft Cargo Hold - Visual Load Distribution
                 </h2>
-                <CargoVisualMap 
+                <CargoVisualMap
                   positions={data.cargoPositions}
                   visualStatus={data.visualStatus}
                   uldSpecs={data.uldSpecs}
+                  aircraftParams={data.aircraftParams}
+                  aircraftType={selectedAircraft}
                 />
+
               </div>
 
               {/* Load Summary */}
@@ -123,7 +156,14 @@ function TrimSheetDashboard({ data }) {
                 <h2 className="text-xl font-bold text-gray-800 mb-4">
                   Center of Gravity Analysis
                 </h2>
-                <CGEnvelopeChart cgAnalysis={data.cgAnalysis} />
+                <CGEnvelopeChart
+                  cgAnalysis={{
+                    ...data.cgAnalysis,
+                    forwardLimit: cgLimits.forward,
+                    aftLimit: cgLimits.aft
+                  }}
+                />
+
               </div>
 
               {/* Detailed Status Checks */}
