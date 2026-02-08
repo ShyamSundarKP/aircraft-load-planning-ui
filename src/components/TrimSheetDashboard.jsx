@@ -126,8 +126,7 @@ function TrimSheetDashboard({ data }) {
             <div className="space-y-8">
               {/* Cargo Visual Map */}
               <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
-                <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                  <span className="text-2xl mr-2">🛫</span>
+                <h2 className="text-xl font-bold text-gray-800 mb-4">
                   Aircraft Cargo Hold - Visual Load Distribution
                 </h2>
                 <CargoVisualMap
